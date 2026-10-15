@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SentinelBank — Online Banking Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .mode-vulnerable { --accent: #ef4444; --accent-bg: #fef2f2; --accent-border: #fecaca; }
+    .mode-safe       { --accent: #22c55e; --accent-bg: #f0fdf4; --accent-border: #bbf7d0; }
+    .sidebar-link.active { background: rgba(255,255,255,0.15); border-left: 3px solid white; }
+    .query-log { background: #1e1e2e; color: #a6e3a1; border-radius: 8px; padding: 12px 16px; font-family: 'Fira Code', monospace, monospace; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .star { color: #facc15; }
+    .toast { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 14px 24px; border-radius: 10px; color: white; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,0.2); animation: slideIn 0.3s ease-out; }
+    .toast-success { background: #22c55e; }
+    .toast-error { background: #ef4444; }
+    .toast-info { background: #3b82f6; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen mode-vulnerable">
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- LOGIN PAGE                                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
+    <div class="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">🏦</div>
+        <h1 class="text-2xl font-bold text-slate-800">SentinelBank</h1>
+        <p class="text-slate-500 text-sm">Online Banking & Wealth Management Portal</p>
+      </div>
+      <!-- Mode selector on login -->
+      <div class="flex items-center justify-center mb-6 gap-3">
+        <button onclick="setMode('vulnerable')" id="login-mode-vuln" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-red-100 text-red-700 border-2 border-red-300">🔴 Vulnerable</button>
+        <button onclick="setMode('safe')" id="login-mode-safe" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gray-100 text-gray-500 border-2 border-gray-200">🟢 Safe</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+        <input type="text" id="login-username" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none mb-3" placeholder="e.g. admin">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+        <input type="text" id="login-password" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none mb-1" placeholder="e.g. SuperSecretAdmin#2026">
+        <p class="text-xs text-slate-400 mb-4">💡 Password field is type=text so SQL payloads are visible during the viva.</p>
+        <button onclick="doLogin()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">Sign In</button>
+      </div>
+      <div id="login-error" class="mt-3 text-red-600 text-sm font-medium hidden"></div>
+      <div id="login-query-log" class="mt-4 hidden">
+        <button onclick="document.getElementById('login-ql-body').classList.toggle('hidden')" class="text-xs text-blue-600 hover:underline cursor-pointer">📋 Toggle Developer Query Log</button>
+        <div id="login-ql-body" class="query-log mt-2 hidden"></div>
+      </div>
+      <div class="mt-6 border-t pt-4">
+        <p class="text-xs text-slate-400 text-center">Test accounts: <strong>admin</strong>, <strong>alice</strong>, <strong>bob</strong>, <strong>charlie</strong>, <strong>diana</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- DASHBOARD (shown after login)                                         -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="dashboard-page" class="hidden min-h-screen">
+    <!-- Top Navbar -->
+    <nav class="bg-slate-900 text-white shadow-xl sticky top-0 z-50">
+      <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🏦</span>
+          <span class="text-lg font-bold tracking-tight">SentinelBank</span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- Mode Toggle -->
+          <button onclick="toggleMode()" id="mode-toggle-btn" class="px-4 py-1.5 rounded-full text-sm font-bold transition-all bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30">
+            🔴 VULNERABLE MODE
+          </button>
+          <!-- User Info -->
+          <div class="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5">
+            <span class="text-sm" id="nav-user">—</span>
+            <span class="text-xs bg-blue-500/30 px-2 py-0.5 rounded-full" id="nav-role">—</span>
+          </div>
+          <!-- Balance -->
+          <div class="bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg text-sm font-bold" id="nav-balance">$0</div>
+          <!-- Reset DB -->
+          <button onclick="resetDB()" class="px-3 py-1.5 bg-amber-500/20 text-amber-400 rounded-lg text-sm font-semibold hover:bg-amber-500/30 border border-amber-500/30 transition-all" title="Reset all database data to seed values">🔄 Reset DB</button>
+          <!-- Logout -->
+          <button onclick="doLogout()" class="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all">⏻ Logout</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="flex">
+      <!-- Sidebar -->
+      <aside class="w-60 bg-slate-800 text-white min-h-[calc(100vh-56px)] sticky top-14 shadow-lg flex-shrink-0">
+        <nav class="py-4 space-y-1">
+          <a onclick="showView('overview')" class="sidebar-link active flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="overview">
+            <span>🏠</span> Overview
+          </a>
+          <a onclick="showView('search')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="search">
+            <span>🔍</span> Payee Search <span class="ml-auto text-[10px] bg-red-500/70 px-1.5 rounded">XSS-R</span>
+          </a>
+          <a onclick="showView('reviews')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="reviews">
+            <span>💬</span> Reviews <span class="ml-auto text-[10px] bg-red-500/70 px-1.5 rounded">XSS-S</span>
+          </a>
+          <a onclick="showView('transfer')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="transfer">
+            <span>💸</span> Wire Transfer <span class="ml-auto text-[10px] bg-orange-500/70 px-1.5 rounded">CSRF</span>
+          </a>
+          <a onclick="showView('settings')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="settings">
+            <span>⚙️</span> Account Settings <span class="ml-auto text-[10px] bg-orange-500/70 px-1.5 rounded">CSRF</span>
+          </a>
+          <a onclick="showView('verify')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="verify">
+            <span>🔎</span> Verify Account <span class="ml-auto text-[10px] bg-purple-500/70 px-1.5 rounded">SQLi-2</span>
+          </a>
+          <a onclick="showView('staff')" class="sidebar-link flex items-center gap-3 px-5 py-3 text-sm hover:bg-white/10 cursor-pointer transition-all" data-view="staff">
+            <span>👥</span> Staff Directory <span class="ml-auto text-[10px] bg-purple-500/70 px-1.5 rounded">SQLi-3</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 p-6 max-w-screen-xl">
+        <!-- ── Promo Banner (DOM-Based XSS) ─────────────────────────────── -->
+        <div id="promo-banner-container" class="mb-4">
+          <div id="promo-banner" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-3 rounded-xl text-sm font-medium shadow-md">
+            🎉 Welcome to SentinelBank! Use referral code <strong>SENTINEL2026</strong> for premium benefits.
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Overview ═══════════ -->
+        <div id="view-overview" class="view fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-4">Account Overview</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow p-5 border-l-4 border-blue-500">
+              <div class="text-sm text-slate-500 mb-1">Account Holder</div>
+              <div class="text-lg font-bold text-slate-800" id="ov-name">—</div>
+              <div class="text-xs text-slate-400 mt-1" id="ov-email">—</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-5 border-l-4 border-emerald-500">
+              <div class="text-sm text-slate-500 mb-1">Available Balance</div>
+              <div class="text-2xl font-bold text-emerald-600" id="ov-balance">$0</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-5 border-l-4 border-purple-500">
+              <div class="text-sm text-slate-500 mb-1">Account Type</div>
+              <div class="text-lg font-bold text-slate-800" id="ov-role">—</div>
+              <div class="text-xs text-slate-400 mt-1" id="ov-id">—</div>
+            </div>
+          </div>
+          <!-- Recent Transactions -->
+          <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-slate-700 mb-3">📊 Recent Transactions</h3>
+            <div id="ov-transactions" class="text-sm text-slate-500">Loading...</div>
+          </div>
+          <!-- DOM XSS Info -->
+          <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+            <strong>🔬 DOM-Based XSS Test:</strong> Append a hash to the URL to test DOM XSS:
+            <br><code class="bg-amber-100 px-2 py-0.5 rounded text-xs">http://localhost:5000/#promo=&lt;img src=x onerror=alert('DOM_XSS_Triggered')&gt;</code>
+            <br><span class="text-xs text-amber-600 mt-1 block">In Vulnerable mode, the banner above will execute the payload. In Safe mode, it will be sanitized.</span>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Payee Search (Reflected XSS) ═══════════ -->
+        <div id="view-search" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">🔍 Payee & Transaction Search</h2>
+          <p class="text-slate-500 text-sm mb-4">Search for payees, accounts, or transactions across SentinelBank.</p>
+          <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex gap-2 mb-4">
+              <input type="text" id="search-input" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Search payee name or username...">
+              <button onclick="doSearch()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">Search</button>
+            </div>
+            <div id="search-results" class="text-slate-600"></div>
+            <div id="search-query-log" class="mt-3 hidden">
+              <div class="query-log"></div>
+            </div>
+          </div>
+          <div class="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm">
+            <strong>🔬 Reflected XSS Payloads to Test:</strong>
+            <br><code class="bg-red-100 px-2 py-0.5 rounded text-xs">&lt;img src=x onerror=alert('Reflected_XSS_Executed')&gt;</code>
+            <br><code class="bg-red-100 px-2 py-0.5 rounded text-xs">&lt;script&gt;alert('Reflected_XSS')&lt;/script&gt;</code>
+            <br><code class="bg-red-100 px-2 py-0.5 rounded text-xs">&lt;svg onload=alert(document.cookie)&gt;</code>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Reviews (Stored XSS) ═══════════ -->
+        <div id="view-reviews" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">💬 Customer Feedback Wall</h2>
+          <p class="text-slate-500 text-sm mb-4">Share your experience with SentinelBank's services.</p>
+          <!-- Post Review Form -->
+          <div class="bg-white rounded-xl shadow p-5 mb-4">
+            <h3 class="font-semibold text-slate-700 mb-3">Write a Review</h3>
+            <div class="flex gap-3 mb-3">
+              <select id="review-rating" class="px-3 py-2 border border-slate-300 rounded-lg">
+                <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                <option value="4">⭐⭐⭐⭐ (4)</option>
+                <option value="3">⭐⭐⭐ (3)</option>
+                <option value="2">⭐⭐ (2)</option>
+                <option value="1">⭐ (1)</option>
+              </select>
+            </div>
+            <textarea id="review-comment" rows="3" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none mb-3" placeholder="Write your review here..."></textarea>
+            <button onclick="postReview()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">Submit Review</button>
+          </div>
+          <!-- Reviews List -->
+          <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-slate-700 mb-3">All Reviews</h3>
+            <div id="reviews-list" class="space-y-3">Loading...</div>
+          </div>
+          <div class="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm">
+            <strong>🔬 Stored XSS Payload to Test:</strong>
+            <br>Post this as a review comment:
+            <br><code class="bg-red-100 px-2 py-0.5 rounded text-xs">&lt;img src=x onerror=alert('Stored_XSS_Executed')&gt;</code>
+            <br><code class="bg-red-100 px-2 py-0.5 rounded text-xs">&lt;script&gt;alert('Stored_XSS')&lt;/script&gt;</code>
+            <br><span class="text-xs text-red-600">In Vulnerable mode, these execute every time any user loads the page.</span>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Wire Transfer (CSRF) ═══════════ -->
+        <div id="view-transfer" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">💸 Instant Wire Transfer</h2>
+          <p class="text-slate-500 text-sm mb-4">Transfer funds to any SentinelBank account holder.</p>
+          <div class="bg-white rounded-xl shadow p-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Recipient Username</label>
+                <input type="text" id="transfer-recipient" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. bob">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Amount ($)</label>
+                <input type="number" id="transfer-amount" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 1000" min="1">
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-slate-700 mb-1">Note (optional)</label>
+              <input type="text" id="transfer-note" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Payment for services">
+            </div>
+            <button onclick="doTransfer()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors">Send Transfer</button>
+            <div id="transfer-result" class="mt-3 text-sm"></div>
+          </div>
+          <div class="mt-4 bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm">
+            <strong>🔬 CSRF Test:</strong> While logged in here, visit the attacker page:
+            <br><a href="http://localhost:5500/csrf-exploit.html" target="_blank" class="text-blue-600 hover:underline font-semibold">http://localhost:5500/csrf-exploit.html</a>
+            <br><span class="text-xs text-orange-600">In Vulnerable mode, the attacker page will silently transfer $5,000 to "bob" and change your email.</span>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Account Settings (CSRF — Email Update) ═══════════ -->
+        <div id="view-settings" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">⚙️ Account Settings</h2>
+          <p class="text-slate-500 text-sm mb-4">Update your account preferences and contact information.</p>
+          <div class="bg-white rounded-xl shadow p-5">
+            <h3 class="font-semibold text-slate-700 mb-3">Update Email Address</h3>
+            <div class="flex gap-2 mb-3">
+              <input type="email" id="settings-email" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="new.email@example.com">
+              <button onclick="updateEmail()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">Update Email</button>
+            </div>
+            <div id="settings-result" class="text-sm"></div>
+            <div class="mt-4 p-3 bg-slate-50 rounded-lg text-sm">
+              <p><strong>Current Email:</strong> <span id="settings-current-email" class="text-blue-600">—</span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Verify Account (Blind SQLi) ═══════════ -->
+        <div id="view-verify" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">🔎 Account Verification & VIP Eligibility</h2>
+          <p class="text-slate-500 text-sm mb-4">Check if a recipient account exists and is active.</p>
+          <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex gap-2 mb-4">
+              <input type="text" id="verify-input" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Enter username to verify...">
+              <button onclick="verifyAccount()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors">Verify</button>
+            </div>
+            <div id="verify-result" class="text-sm"></div>
+            <div id="verify-query-log" class="mt-3 hidden">
+              <div class="query-log"></div>
+            </div>
+          </div>
+          <div class="mt-4 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm">
+            <strong>🔬 Blind Boolean SQLi Payloads:</strong>
+            <br>✅ TRUE test: <code class="bg-purple-100 px-2 py-0.5 rounded text-xs">admin' AND SUBSTRING(password, 1, 1) = 'S' --</code>
+            <br>❌ FALSE test: <code class="bg-purple-100 px-2 py-0.5 rounded text-xs">admin' AND SUBSTRING(password, 1, 1) = 'Z' --</code>
+            <br>💥 Error-based: <code class="bg-purple-100 px-2 py-0.5 rounded text-xs">admin' AND 1=CAST((SELECT password FROM users WHERE username='admin') AS INT) --</code>
+          </div>
+        </div>
+
+        <!-- ═══════════ VIEW: Staff Directory (Advanced UNION SQLi) ═══════════ -->
+        <div id="view-staff" class="view hidden fade-in">
+          <h2 class="text-2xl font-bold text-slate-800 mb-1">👥 Branch & Staff Directory</h2>
+          <p class="text-slate-500 text-sm mb-4">Search bank staff by department name.</p>
+          <div class="bg-white rounded-xl shadow p-5">
+            <div class="flex gap-2 mb-4">
+              <input type="text" id="staff-input" class="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Technology, Banking, Wealth...">
+              <button onclick="searchStaff()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors">Search</button>
+            </div>
+            <div id="staff-results" class="overflow-x-auto"></div>
+            <div id="staff-query-log" class="mt-3 hidden">
+              <div class="query-log"></div>
+            </div>
+          </div>
+          <div class="mt-4 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm space-y-2">
+            <strong>🔬 4-Stage UNION SQLi Attack Chain:</strong>
+            <br><strong>Stage 1</strong> (Column Count): <code class="bg-purple-100 px-1 rounded text-xs">%' ORDER BY 4 --</code> (ok) vs <code class="bg-purple-100 px-1 rounded text-xs">%' ORDER BY 5 --</code> (error)
+            <br><strong>Stage 1b</strong> (Confirm): <code class="bg-purple-100 px-1 rounded text-xs">%' UNION SELECT '1','2','3','4' --</code>
+            <br><strong>Stage 2</strong> (Tables): <code class="bg-purple-100 px-1 rounded text-xs">%' UNION SELECT table_schema, table_name, table_type, '4' FROM information_schema.tables WHERE table_schema = 'public' --</code>
+            <br><strong>Stage 3</strong> (Columns): <code class="bg-purple-100 px-1 rounded text-xs">%' UNION SELECT table_name, column_name, data_type, '4' FROM information_schema.columns WHERE table_name = 'users' --</code>
+            <br><strong>Stage 4</strong> (Dump): <code class="bg-purple-100 px-1 rounded text-xs">%' UNION SELECT username, password, email, role || ' ($' || balance::text || ')' FROM users --</code>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- APPLICATION JAVASCRIPT                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    // ── Global State ──────────────────────────────────────────────────────
+    let currentMode = 'vulnerable'; // 'vulnerable' | 'safe'
+    let currentUser = null;
+    let csrfToken = null;
+
+    const API = () => `/api/${currentMode}`;
+
+    // ── Mode Switching ────────────────────────────────────────────────────
+    function setMode(mode) {
+      currentMode = mode;
+      document.body.classList.remove('mode-vulnerable', 'mode-safe');
+      document.body.classList.add(`mode-${mode}`);
+
+      const vBtn = document.getElementById('login-mode-vuln');
+      const sBtn = document.getElementById('login-mode-safe');
+      if (mode === 'vulnerable') {
+        vBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-red-100 text-red-700 border-2 border-red-300';
+        sBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gray-100 text-gray-500 border-2 border-gray-200';
+      } else {
+        sBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-green-100 text-green-700 border-2 border-green-300';
+        vBtn.className = 'px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-gray-100 text-gray-500 border-2 border-gray-200';
+      }
+      updateModeToggle();
+    }
+
+    function toggleMode() {
+      setMode(currentMode === 'vulnerable' ? 'safe' : 'vulnerable');
+      showToast(`Switched to ${currentMode === 'vulnerable' ? '🔴 Vulnerable' : '🟢 Safe'} Mode`, 'info');
+      // Refresh current view data
+      const activeView = document.querySelector('.sidebar-link.active')?.dataset.view;
+      if (activeView) loadViewData(activeView);
+    }
+
+    function updateModeToggle() {
+      const btn = document.getElementById('mode-toggle-btn');
+      if (!btn) return;
+      if (currentMode === 'vulnerable') {
+        btn.className = 'px-4 py-1.5 rounded-full text-sm font-bold transition-all bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30';
+        btn.textContent = '🔴 VULNERABLE MODE';
+      } else {
+        btn.className = 'px-4 py-1.5 rounded-full text-sm font-bold transition-all bg-green-500/20 text-green-400 border border-green-500/50 hover:bg-green-500/30';
+        btn.textContent = '🟢 SAFE MODE';
+      }
+    }
+
+    // ── Toast Notifications ───────────────────────────────────────────────
+    function showToast(msg, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3500);
+    }
+
+    // ── Login ─────────────────────────────────────────────────────────────
+    async function doLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value.trim();
+      const errEl = document.getElementById('login-error');
+      const qlEl = document.getElementById('login-query-log');
+      const qlBody = document.getElementById('login-ql-body');
+
+      if (!username) { errEl.textContent = 'Please enter a username.'; errEl.classList.remove('hidden'); return; }
+
+      try {
+        const resp = await fetch(`${API()}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await resp.json();
+
+        // Show query log (for SQL injection demonstration)
+        if (data.queryLog) {
+          qlEl.classList.remove('hidden');
+          qlBody.classList.remove('hidden');
+          qlBody.textContent = data.queryLog;
+        }
+
+        if (data.success) {
+          currentUser = data.user;
+          csrfToken = data.csrfToken || null;
+          errEl.classList.add('hidden');
+          showDashboard();
+          showToast(`Welcome, ${currentUser.fullName}!`, 'success');
+        } else {
+          errEl.textContent = data.message;
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = `Connection error: ${err.message}`;
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // ── Logout ────────────────────────────────────────────────────────────
+    async function doLogout() {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      currentUser = null;
+      csrfToken = null;
+      document.getElementById('dashboard-page').classList.add('hidden');
+      document.getElementById('login-page').classList.remove('hidden');
+      document.getElementById('login-password').value = '';
+      showToast('Logged out successfully', 'info');
+    }
+
+    // ── Show Dashboard ────────────────────────────────────────────────────
+    function showDashboard() {
+      document.getElementById('login-page').classList.add('hidden');
+      document.getElementById('dashboard-page').classList.remove('hidden');
+      updateNavbar();
+      updateModeToggle();
+      showView('overview');
+      handleDomXSS();
+    }
+
+    function updateNavbar() {
+      if (!currentUser) return;
+      document.getElementById('nav-user').textContent = currentUser.fullName;
+      document.getElementById('nav-role').textContent = currentUser.role;
+      document.getElementById('nav-balance').textContent = `$${currentUser.balance.toLocaleString()}`;
+    }
+
+    // ── Refresh Session ───────────────────────────────────────────────────
+    async function refreshSession() {
+      try {
+        const resp = await fetch('/api/session', { credentials: 'include' });
+        const data = await resp.json();
+        if (data.loggedIn) {
+          currentUser = data.user;
+          csrfToken = data.csrfToken || csrfToken;
+          updateNavbar();
+        }
+      } catch (_) {}
+    }
+
+    // ── View Navigation ───────────────────────────────────────────────────
+    function showView(viewName) {
+      // Hide all views
+      document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+      // Show target
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) { target.classList.remove('hidden'); target.classList.add('fade-in'); }
+      // Update sidebar
+      document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+      document.querySelector(`.sidebar-link[data-view="${viewName}"]`)?.classList.add('active');
+      // Load data
+      loadViewData(viewName);
+    }
+
+    async function loadViewData(viewName) {
+      switch (viewName) {
+        case 'overview': await loadOverview(); break;
+        case 'reviews': await loadReviews(); break;
+        case 'settings': loadSettings(); break;
+      }
+    }
+
+    // ── Overview ──────────────────────────────────────────────────────────
+    async function loadOverview() {
+      await refreshSession();
+      if (!currentUser) return;
+      document.getElementById('ov-name').textContent = currentUser.fullName;
+      document.getElementById('ov-email').textContent = currentUser.email;
+      document.getElementById('ov-balance').textContent = `$${currentUser.balance.toLocaleString()}`;
+      document.getElementById('ov-role').textContent = currentUser.role.replace(/_/g, ' ').toUpperCase();
+      document.getElementById('ov-id').textContent = currentUser.id;
+
+      // Load transactions
+      try {
+        const resp = await fetch(`${API()}/transactions`, { credentials: 'include' });
+        const data = await resp.json();
+        const container = document.getElementById('ov-transactions');
+        if (data.success && data.transactions.length > 0) {
+          container.innerHTML = `<table class="w-full text-sm">
+            <thead><tr class="border-b"><th class="py-2 text-left">From</th><th class="text-left">To</th><th class="text-right">Amount</th><th class="text-left">Note</th><th class="text-left">Date</th></tr></thead>
+            <tbody>${data.transactions.map(t => `<tr class="border-b border-slate-100">
+              <td class="py-2 ${t.sender === currentUser.username ? 'text-red-600 font-medium' : ''}">${escH(t.sender)}</td>
+              <td class="${t.recipient === currentUser.username ? 'text-green-600 font-medium' : ''}">${escH(t.recipient)}</td>
+              <td class="text-right font-mono">\$${t.amount.toLocaleString()}</td>
+              <td class="text-slate-400">${escH(t.note)}</td>
+              <td class="text-slate-400">${new Date(t.created_at).toLocaleDateString()}</td>
+            </tr>`).join('')}</tbody></table>`;
+        } else {
+          container.textContent = 'No transactions yet.';
+        }
+      } catch (_) {}
+    }
+
+    // ── Payee Search (Reflected XSS) ──────────────────────────────────────
+    async function doSearch() {
+      const q = document.getElementById('search-input').value;
+      if (!q) return;
+
+      try {
+        const resp = await fetch(`${API()}/search-payee?q=${encodeURIComponent(q)}`, { credentials: 'include' });
+        const data = await resp.json();
+        const container = document.getElementById('search-results');
+
+        if (currentMode === 'vulnerable') {
+          // ⚠️ VULNERABLE: innerHTML renders raw HTML from server — XSS executes
+          container.innerHTML = data.html;
+          // Execute inline scripts (innerHTML doesn't execute <script> tags by default)
+          container.querySelectorAll('script').forEach(old => {
+            const s = document.createElement('script');
+            s.textContent = old.textContent;
+            old.parentNode.replaceChild(s, old);
+          });
+        } else {
+          // ✅ SAFE: Use textContent — scripts render as harmless text
+          container.textContent = '';
+          const p = document.createElement('p');
+          p.className = 'text-lg';
+          p.innerHTML = `Search results for: <strong>${escH(data.query)}</strong>`;
+          container.appendChild(p);
+        }
+
+        // Show matching users
+        if (data.results && data.results.length > 0) {
+          const tbl = document.createElement('div');
+          tbl.className = 'mt-3';
+          tbl.innerHTML = `<table class="w-full text-sm"><thead><tr class="border-b"><th class="py-2 text-left">Username</th><th class="text-left">Full Name</th><th class="text-left">Email</th></tr></thead>
+            <tbody>${data.results.map(r => `<tr class="border-b border-slate-100"><td class="py-2">${escH(r.username)}</td><td>${escH(r.full_name)}</td><td>${escH(r.email)}</td></tr>`).join('')}</tbody></table>`;
+          container.appendChild(tbl);
+        }
+
+        // Query log
+        const ql = document.getElementById('search-query-log');
+        ql.classList.remove('hidden');
+        ql.querySelector('.query-log').textContent = `Mode: ${currentMode}\nQuery: ${q}`;
+      } catch (err) {
+        showToast('Search failed: ' + err.message, 'error');
+      }
+    }
+
+    // ── Reviews (Stored XSS) ──────────────────────────────────────────────
+    async function loadReviews() {
+      try {
+        const resp = await fetch(`${API()}/reviews`, { credentials: 'include' });
+        const data = await resp.json();
+        const container = document.getElementById('reviews-list');
+        container.innerHTML = '';
+
+        if (data.reviews && data.reviews.length > 0) {
+          data.reviews.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'border border-slate-200 rounded-lg p-4';
+
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between mb-2';
+            header.innerHTML = `<span class="font-semibold text-slate-700">${escH(r.author)}</span>
+              <span class="text-xs text-slate-400">${new Date(r.created_at).toLocaleDateString()}</span>`;
+            card.appendChild(header);
+
+            const stars = document.createElement('div');
+            stars.className = 'star text-sm mb-2';
+            stars.textContent = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+            card.appendChild(stars);
+
+            const comment = document.createElement('div');
+            comment.className = 'text-sm text-slate-600';
+
+            if (currentMode === 'vulnerable') {
+              // ⚠️ VULNERABLE: innerHTML renders stored HTML/JS — XSS executes
+              comment.innerHTML = r.comment;
+              // Execute any <script> tags
+              comment.querySelectorAll('script').forEach(old => {
+                const s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.parentNode.replaceChild(s, old);
+              });
+            } else {
+              // ✅ SAFE: textContent renders everything as plain text
+              comment.textContent = r.comment;
+            }
+
+            card.appendChild(comment);
+            container.appendChild(card);
+          });
+        } else {
+          container.textContent = 'No reviews yet. Be the first to share your experience!';
+        }
+      } catch (err) {
+        showToast('Failed to load reviews', 'error');
+      }
+    }
+
+    async function postReview() {
+      const comment = document.getElementById('review-comment').value;
+      const rating = document.getElementById('review-rating').value;
+      if (!comment.trim()) { showToast('Please write a comment', 'error'); return; }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (currentMode === 'safe' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+      try {
+        const resp = await fetch(`${API()}/reviews`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ comment, rating: parseInt(rating) }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          showToast('Review posted!', 'success');
+          document.getElementById('review-comment').value = '';
+          await loadReviews();
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        showToast('Failed to post review: ' + err.message, 'error');
+      }
+    }
+
+    // ── Wire Transfer (CSRF) ──────────────────────────────────────────────
+    async function doTransfer() {
+      const recipient = document.getElementById('transfer-recipient').value.trim();
+      const amount = document.getElementById('transfer-amount').value;
+      const note = document.getElementById('transfer-note').value;
+      const resultEl = document.getElementById('transfer-result');
+
+      if (!recipient || !amount) { showToast('Please fill in recipient and amount', 'error'); return; }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (currentMode === 'safe' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+      try {
+        const resp = await fetch(`${API()}/transfer`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ recipient, amount: parseInt(amount), note }),
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          resultEl.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700">${escH(data.message)}<br><span class="text-xs">New Balance: \$${data.newBalance.toLocaleString()}</span></div>`;
+          currentUser.balance = data.newBalance;
+          updateNavbar();
+          showToast('Transfer successful!', 'success');
+        } else {
+          resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">${escH(data.message)}</div>`;
+        }
+      } catch (err) {
+        resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">Error: ${escH(err.message)}</div>`;
+      }
+    }
+
+    // ── Account Settings (Email Update — CSRF) ────────────────────────────
+    function loadSettings() {
+      if (currentUser) {
+        document.getElementById('settings-current-email').textContent = currentUser.email;
+      }
+    }
+
+    async function updateEmail() {
+      const newEmail = document.getElementById('settings-email').value.trim();
+      const resultEl = document.getElementById('settings-result');
+      if (!newEmail) { showToast('Please enter an email', 'error'); return; }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (currentMode === 'safe' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+      try {
+        const resp = await fetch(`${API()}/update-email`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ newEmail }),
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          resultEl.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700">${escH(data.message)}</div>`;
+          currentUser.email = newEmail;
+          document.getElementById('settings-current-email').textContent = newEmail;
+          showToast('Email updated!', 'success');
+        } else {
+          resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">${escH(data.message)}</div>`;
+        }
+      } catch (err) {
+        resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">Error: ${escH(err.message)}</div>`;
+      }
+    }
+
+    // ── Verify Account (Blind SQLi) ───────────────────────────────────────
+    async function verifyAccount() {
+      const username = document.getElementById('verify-input').value;
+      if (!username) return;
+      const resultEl = document.getElementById('verify-result');
+      const qlEl = document.getElementById('verify-query-log');
+
+      try {
+        const resp = await fetch(`${API()}/verify-account?username=${encodeURIComponent(username)}`, { credentials: 'include' });
+        const data = await resp.json();
+
+        if (data.status === 'active') {
+          resultEl.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <span class="text-green-700 font-semibold">${escH(data.message)}</span>
+            <div class="text-sm text-green-600 mt-1">Username: ${escH(data.data?.username || '—')} | Role: ${escH(data.data?.role || '—')}</div>
+          </div>`;
+        } else if (data.status === 'not_found') {
+          resultEl.innerHTML = `<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-700 font-semibold">${escH(data.message)}</div>`;
+        } else {
+          resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">${escH(data.message)}</div>`;
+        }
+
+        if (data.queryLog) {
+          qlEl.classList.remove('hidden');
+          qlEl.querySelector('.query-log').textContent = data.queryLog;
+        }
+      } catch (err) {
+        resultEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">Error: ${escH(err.message)}</div>`;
+      }
+    }
+
+    // ── Staff Directory (Advanced UNION SQLi) ─────────────────────────────
+    async function searchStaff() {
+      const dept = document.getElementById('staff-input').value;
+      const container = document.getElementById('staff-results');
+      const qlEl = document.getElementById('staff-query-log');
+
+      try {
+        const resp = await fetch(`${API()}/staff?dept=${encodeURIComponent(dept)}`, { credentials: 'include' });
+        const data = await resp.json();
+
+        if (data.success && data.results && data.results.length > 0) {
+          const cols = Object.keys(data.results[0]);
+          container.innerHTML = `<table class="w-full text-sm border-collapse">
+            <thead><tr class="bg-slate-100">${cols.map(c => `<th class="py-2 px-3 text-left border-b font-semibold text-slate-700">${escH(c)}</th>`).join('')}</tr></thead>
+            <tbody>${data.results.map(r => `<tr class="border-b border-slate-100 hover:bg-slate-50">${cols.map(c => `<td class="py-2 px-3 font-mono text-xs">${escH(String(r[c] || ''))}</td>`).join('')}</tr>`).join('')}</tbody>
+          </table>`;
+        } else if (!data.success) {
+          container.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">${escH(data.message)}</div>`;
+        } else {
+          container.innerHTML = '<p class="text-slate-500">No results found.</p>';
+        }
+
+        if (data.query) {
+          qlEl.classList.remove('hidden');
+          qlEl.querySelector('.query-log').textContent = data.query;
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700">Error: ${escH(err.message)}</div>`;
+      }
+    }
+
+    // ── Reset Database ────────────────────────────────────────────────────
+    async function resetDB() {
+      if (!confirm('Reset all database data to initial seed values? You will be logged out.')) return;
+      try {
+        const resp = await fetch('/api/reset-db', { method: 'POST', credentials: 'include' });
+        const data = await resp.json();
+        if (data.success) {
+          showToast('Database reset successfully!', 'success');
+          setTimeout(() => doLogout(), 1000);
+        } else {
+          showToast('Reset failed: ' + data.message, 'error');
+        }
+      } catch (err) {
+        showToast('Reset failed: ' + err.message, 'error');
+      }
+    }
+
+    // ── DOM-Based XSS Handler ─────────────────────────────────────────────
+    function handleDomXSS() {
+      const hash = window.location.hash;
+      if (!hash || hash.length < 2) return;
+
+      const banner = document.getElementById('promo-banner');
+      try {
+        const decoded = decodeURIComponent(hash.substring(1));
+        const params = new URLSearchParams(decoded);
+        const promoValue = params.get('promo') || decoded;
+
+        if (currentMode === 'vulnerable') {
+          // ⚠️ VULNERABLE: innerHTML — arbitrary HTML/JS from URL hash executes
+          banner.innerHTML = `🎉 Promo: ${promoValue}`;
+          // Execute script tags
+          banner.querySelectorAll('script').forEach(old => {
+            const s = document.createElement('script');
+            s.textContent = old.textContent;
+            old.parentNode.replaceChild(s, old);
+          });
+        } else {
+          // ✅ SAFE: Validate against allowlist, use textContent
+          const allowed = ['welcome', 'sentinel2026', 'diwali2026', 'newyear2027', 'premium', 'vip'];
+          if (allowed.includes(promoValue.toLowerCase())) {
+            banner.textContent = `🎉 Active Promo: ${promoValue}`;
+          } else {
+            banner.textContent = '🎉 Welcome to SentinelBank! Invalid or unrecognized promo code.';
+          }
+        }
+      } catch (_) {
+        banner.textContent = '🎉 Welcome to SentinelBank!';
+      }
+    }
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleDomXSS);
+
+    // ── Utility: HTML escape for safe client-side rendering ───────────────
+    function escH(str) {
+      if (str === null || str === undefined) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+
+    // ── Auto-check session on page load ───────────────────────────────────
+    (async function init() {
+      try {
+        const resp = await fetch('/api/session', { credentials: 'include' });
+        const data = await resp.json();
+        if (data.loggedIn) {
+          currentUser = data.user;
+          csrfToken = data.csrfToken || null;
+          showDashboard();
+        }
+      } catch (_) {}
+    })();
+  </script>
+</body>
+</html>
+
