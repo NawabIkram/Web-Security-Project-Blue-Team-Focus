@@ -158,9 +158,8 @@ export function createSafeRouter(getDB, sessions) {
     const db = getDB();
     const q = req.query.q || '';
 
-    // ✅ SAFE: Validate & sanitize input, HTML-encode output
-    const safeQ = sanitizeInput(q, 100);
-    const encodedQ = escapeHTML(safeQ);
+    // ✅ SAFE: Server-side HTML entity encoding for output display
+    const encodedQ = escapeHTML(q.slice(0, 100));
 
     const html = `<div class="search-result-banner">
       <p class="text-lg">Search results for: <strong>${encodedQ}</strong></p>
@@ -171,7 +170,7 @@ export function createSafeRouter(getDB, sessions) {
       // ✅ SAFE: Parameterized query
       const result = await db.query(
         'SELECT username, full_name, email FROM users WHERE username LIKE $1 OR full_name LIKE $1',
-        [`%${safeQ}%`]
+        [`%${q.slice(0, 100)}%`]
       );
       results = result.rows;
     } catch (_) {
