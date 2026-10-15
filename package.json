@@ -1,0 +1,23 @@
+{
+  "name": "sentinelbank-security-lab",
+  "version": "1.0.0",
+  "description": "SentinelBank — Online Banking Web Security Lab (Blue Team Focus)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js & node attacker-server.js && wait",
+    "server": "node server.js",
+    "attacker": "node attacker-server.js",
+    "verify": "node verify-exploits.js",
+    "reset": "rm -rf pgdata && echo 'Database cleared. Restart server to re-seed.'"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.15",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.1"
+  },
+  "author": "IS2 Security Lab",
+  "license": "MIT"
+}
+
